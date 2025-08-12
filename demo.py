@@ -96,6 +96,26 @@ try:
     
     print(f"\n✅ Processed {frame_count} frames\n")
     
+    # Finalize any active gestures
+    analyzer.gesture_detector.finalize_active_gestures(timestamp)
+    
+    # Process any finalized gestures as service requests
+    for gesture in analyzer.gesture_detector.gesture_events:
+        if gesture.position:
+            table_id = analyzer.table_mapper.assign_person_to_table(gesture.position)
+            gesture.table_id = table_id
+        
+        # Add to service metrics if not already processed
+        analyzer.service_metrics.add_request_event(
+            gesture.timestamp, gesture.person_id, gesture.table_id
+        )
+        
+        # Check for responses from waiters
+        waiters = analyzer.person_tracker.get_waiters()
+        analyzer.gesture_detector.check_gesture_response(
+            gesture, waiters, timestamp
+        )
+    
     # Generate and save results
     print("📊 Generating analysis results...")
     analyzer.generate_results()

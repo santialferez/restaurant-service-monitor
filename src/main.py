@@ -44,7 +44,7 @@ class RestaurantAnalyzer:
         frame_shape = (self.video_processor.height, self.video_processor.width)
         
         # Core components
-        self.person_tracker = PersonTracker(model_size='yolov8m.pt', conf_threshold=0.5)
+        self.person_tracker = PersonTracker(model_size='yolov8m.pt', conf_threshold=0.5, movement_threshold=3.0)
         self.gesture_detector = GestureDetector(min_detection_confidence=0.5)
         self.table_mapper = TableMapper(config_path)
         

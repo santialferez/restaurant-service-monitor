@@ -233,6 +233,19 @@ class GestureDetector:
         
         return stats
     
+    def finalize_active_gestures(self, current_timestamp: float):
+        """Finalize any active gestures at the end of processing"""
+        for person_id, gesture in list(self.active_gestures.items()):
+            duration = current_timestamp - gesture.timestamp
+            
+            if duration >= self.hand_raise_duration_threshold:
+                # Valid gesture - add to events
+                self.gesture_events.append(gesture)
+                self.last_gesture_time[person_id] = current_timestamp
+                logger.info(f"Hand raise finalized: Person {person_id}, duration: {duration:.2f}s")
+            
+            del self.active_gestures[person_id]
+    
     def reset(self):
         self.gesture_events.clear()
         self.active_gestures.clear()
