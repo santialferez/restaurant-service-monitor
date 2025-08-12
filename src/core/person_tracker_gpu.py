@@ -40,9 +40,9 @@ class PersonTrackerGPU:
     
     def __init__(self, 
                  model_size: str = 'yolov8m.pt',
-                 conf_threshold: float = 0.5,
-                 max_age: int = 30,
-                 movement_threshold: float = 3.0,
+                 conf_threshold: float = 0.6,  # Balanced threshold to avoid over-detection
+                 max_age: int = 45,  # Keep tracks longer to reduce ID fragmentation  
+                 movement_threshold: float = 4.0,  # Higher threshold for better classification
                  batch_size: int = 8,
                  use_tensorrt: bool = True,
                  use_half_precision: bool = True):
@@ -69,12 +69,17 @@ class PersonTrackerGPU:
         
         self.conf_threshold = conf_threshold
         
-        # Initialize DeepSORT tracker with GPU-optimized embedder
+        # Initialize DeepSORT tracker with optimized parameters
         self.tracker = DeepSort(
             max_age=max_age, 
-            n_init=3, 
-            nms_max_overlap=0.5,
-            embedder="mobilenet"  # Use MobileNet embedder
+            n_init=2,  # Fewer frames to confirm track (faster detection)
+            nms_max_overlap=0.3,  # Stricter overlap threshold to avoid duplicates
+            embedder="mobilenet",  # Use MobileNet embedder
+            embedder_gpu=True,  # Enable GPU embedder
+            embedder_model_name="mobilenetv2_x1_0",
+            embedder_wts=None,
+            polygon=False,
+            today=None
         )
         
         # Person tracking
@@ -177,45 +182,39 @@ class PersonTrackerGPU:
         
         start_time = time.time()
         
-        # Preprocess frames
-        batch_tensor = self._preprocess_frames_batch(frames)
+        # Use YOLO predict method instead of direct model call to avoid precision issues
+        batch_detections = []
         
-        # Batch inference
-        with torch.no_grad():
-            results = self.yolo.model(batch_tensor)
+        for frame in frames:
+            frame_detections = []
+            
+            # Use YOLO predict method which handles precision correctly
+            results = self.yolo.predict(frame, verbose=False)
+            
+            for result in results:
+                # Get detections for person class (class 0 in COCO)  
+                if hasattr(result, 'boxes') and result.boxes is not None:
+                    boxes = result.boxes.xyxy.cpu().numpy().astype(np.float32)  # Ensure float32
+                    confidences = result.boxes.conf.cpu().numpy().astype(np.float32)
+                    classes = result.boxes.cls.cpu().numpy().astype(np.int32)
+                    
+                    for box, conf, cls in zip(boxes, confidences, classes):
+                        if cls == 0 and conf > self.conf_threshold:  # Person class
+                            # Convert to integer coordinates
+                            x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+                            
+                            bbox_xyxy = (x1, y1, x2, y2)
+                            bbox_xywh = (x1, y1, x2 - x1, y2 - y1)
+                            
+                            # Ensure confidence is float32 for DeepSORT compatibility
+                            conf_float32 = float(conf)
+                            
+                            frame_detections.append((bbox_xywh, conf_float32, 'person'))
+            
+            batch_detections.append(frame_detections)
         
         detection_time = time.time() - start_time
         self.processing_times['detection'].append(detection_time)
-        
-        # Process results for each frame
-        batch_detections = []
-        
-        for i, result in enumerate(results):
-            frame_detections = []
-            
-            # Get detections for person class (class 0 in COCO)
-            if hasattr(result, 'boxes') and result.boxes is not None:
-                boxes = result.boxes.xyxy.cpu().numpy()
-                confidences = result.boxes.conf.cpu().numpy()
-                classes = result.boxes.cls.cpu().numpy()
-                
-                # Scale back to original frame size
-                h, w = frames[i].shape[:2]
-                scale_x, scale_y = w / 640, h / 640
-                
-                for box, conf, cls in zip(boxes, confidences, classes):
-                    if cls == 0 and conf > self.conf_threshold:  # Person class
-                        # Scale coordinates back to original size
-                        x1, y1, x2, y2 = box
-                        x1, x2 = int(x1 * scale_x), int(x2 * scale_x)
-                        y1, y2 = int(y1 * scale_y), int(y2 * scale_y)
-                        
-                        bbox_xyxy = (x1, y1, x2, y2)
-                        bbox_xywh = (x1, y1, x2 - x1, y2 - y1)
-                        
-                        frame_detections.append((bbox_xywh, conf, 'person'))
-            
-            batch_detections.append(frame_detections)
         
         return batch_detections
     
