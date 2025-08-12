@@ -1,0 +1,38 @@
+# Core Computer Vision & ML Libraries
+opencv-python==4.8.1.78
+opencv-contrib-python==4.8.1.78
+ultralytics==8.0.200  # YOLOv8
+mediapipe==0.10.7  # Pose detection
+deep-sort-realtime==1.3.2  # Multi-object tracking
+
+# Data Processing
+numpy==1.24.3
+pandas==2.1.3
+scipy==1.11.4
+
+# Visualization & Dashboard
+matplotlib==3.8.1
+seaborn==0.13.0
+plotly==5.18.0
+streamlit==1.28.2
+streamlit-aggrid==0.3.4
+
+# Video Processing
+imageio==2.31.6
+imageio-ffmpeg==0.4.9
+moviepy==1.0.3
+
+# Utilities
+PyYAML==6.0.1
+tqdm==4.66.1
+Pillow==10.1.0
+scikit-learn==1.3.2
+filterpy==1.4.5  # For Kalman filtering in tracking
+
+# Performance & Optimization
+numba==0.58.1
+joblib==1.3.2
+
+# Report Generation
+reportlab==4.0.7
+xlsxwriter==3.1.9

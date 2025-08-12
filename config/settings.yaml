@@ -1,0 +1,114 @@
+# Restaurant Service Monitoring System Configuration
+
+# Video Processing Settings
+video:
+  skip_frames: 2  # Process every Nth frame (1 = process all frames)
+  resize_factor: 0.5  # Resize video frames (1.0 = original size)
+  output_fps: 30  # FPS for output videos
+
+# Person Detection & Tracking
+detection:
+  model: "yolov8m.pt"  # YOLO model size (yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt)
+  confidence_threshold: 0.5  # Minimum confidence for person detection
+  tracking:
+    max_age: 30  # Maximum frames to keep track without detection
+    n_init: 3  # Number of consecutive detections before track is confirmed
+    nms_overlap: 0.5  # Non-maximum suppression overlap threshold
+
+# Gesture Recognition
+gesture:
+  min_detection_confidence: 0.5  # MediaPipe pose detection confidence
+  min_tracking_confidence: 0.5  # MediaPipe pose tracking confidence
+  hand_raise_threshold: 0.7  # Confidence threshold for hand raise detection
+  hand_raise_duration: 1.0  # Minimum duration (seconds) for valid hand raise
+  gesture_cooldown: 5.0  # Cooldown period (seconds) between gestures from same person
+
+# Person Classification
+classification:
+  movement_threshold: 100.0  # Pixels per frame - threshold to classify as waiter
+  classification_window: 30  # Number of frames to analyze for classification
+
+# Table Management
+tables:
+  auto_detect: true  # Attempt automatic table detection
+  detection_area_min: 5000  # Minimum area for table detection
+  detection_area_max: 50000  # Maximum area for table detection
+  visit_distance_threshold: 100  # Distance (pixels) to consider waiter at table
+  attention_threshold: 300  # Time (seconds) before table needs attention
+
+# Service Metrics
+metrics:
+  response_time_target: 30  # Target response time in seconds
+  response_rate_target: 0.95  # Target response rate (95%)
+  visit_interval_target: 180  # Target table visit interval (3 minutes)
+  
+# Movement Analysis
+movement:
+  grid_size: 50  # Grid cell size for movement analysis
+  heatmap_blur_size: 51  # Gaussian blur kernel size for heatmap
+  common_route_min_support: 3  # Minimum occurrences for common route
+  
+# Performance Thresholds
+performance:
+  efficiency_score:
+    excellent: 90
+    good: 75
+    needs_improvement: 60
+  response_time:
+    excellent: 20
+    good: 30
+    poor: 45
+
+# Visualization Settings
+visualization:
+  colors:
+    waiter: [0, 255, 0]  # Green
+    customer: [255, 0, 0]  # Blue (BGR format)
+    hand_raised: [0, 255, 255]  # Yellow
+    table_good: [0, 255, 0]  # Green
+    table_attention: [0, 165, 255]  # Orange
+    table_urgent: [0, 0, 255]  # Red
+  
+  heatmap:
+    colormap: "jet"  # OpenCV colormap
+    alpha: 0.5  # Transparency for overlay
+  
+  annotations:
+    font_scale: 0.5
+    thickness: 2
+    show_ids: true
+    show_paths: true
+    show_confidence: false
+
+# Dashboard Settings
+dashboard:
+  refresh_interval: 5  # Seconds between dashboard updates
+  max_events_display: 100  # Maximum events to display
+  export_formats: ["csv", "xlsx", "json", "pdf"]
+
+# Output Settings
+output:
+  save_annotated_frames: true
+  frame_save_interval: 300  # Save frame every N frames
+  generate_video: false  # Generate annotated output video
+  generate_heatmap: true
+  generate_flow_field: true
+  generate_statistics: true
+  
+  formats:
+    images: "jpg"
+    reports: ["txt", "pdf", "html"]
+    data: ["json", "csv", "xlsx"]
+
+# Logging Settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/analysis.log"
+
+# System Settings
+system:
+  use_gpu: true  # Use GPU acceleration if available
+  batch_size: 32  # Batch size for processing
+  num_workers: 4  # Number of worker threads
+  cache_size: 1000  # Maximum cached frames
