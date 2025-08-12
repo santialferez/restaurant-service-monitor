@@ -1,0 +1,71 @@
+# Core Computer Vision & ML Libraries with GPU Support
+opencv-python==4.8.1.78
+opencv-contrib-python==4.8.1.78
+ultralytics==8.0.200  # YOLOv8 with GPU support
+
+# PyTorch with CUDA 12.1 support
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+
+# Deep Learning Frameworks for GPU acceleration
+deep-sort-realtime==1.3.2  # Multi-object tracking
+
+# GPU-accelerated pose detection alternatives to MediaPipe
+# We'll implement multiple options for flexibility
+mmcv>=2.0.0  # Computer vision library for MMPose
+mmpose>=1.2.0  # GPU-accelerated pose detection
+mmdet>=3.0.0  # Object detection models
+
+# CUDA acceleration libraries
+cupy>=12.0.0  # NumPy-like GPU arrays
+pycuda>=2022.2.2  # CUDA Python bindings
+
+# TensorRT for model optimization
+tensorrt>=8.6.0; platform_system == "Linux"
+onnx>=1.14.0  # ONNX format for model conversion
+onnxruntime-gpu>=1.16.0  # ONNX runtime with GPU support
+
+# Data Processing with GPU support where available
+numpy==1.24.3
+pandas==2.1.3
+scipy==1.11.4
+scikit-learn==1.3.2
+
+# Visualization & Dashboard (same as before)
+matplotlib==3.8.1
+seaborn==0.13.0
+plotly==5.18.0
+streamlit==1.28.2
+streamlit-aggrid==0.3.4
+
+# Video Processing (optimized versions)
+imageio==2.31.6
+imageio-ffmpeg==0.4.9
+moviepy==1.0.3
+decord>=0.6.0  # Fast video loader with GPU support
+
+# Utilities
+PyYAML==6.0.1
+tqdm==4.66.1
+Pillow==10.1.0
+filterpy==1.4.5  # For Kalman filtering in tracking
+
+# Performance & Optimization
+numba>=0.58.1  # JIT compilation with CUDA support
+joblib==1.3.2
+
+# Report Generation
+reportlab==4.0.7
+xlsxwriter==3.1.9
+
+# Memory management and profiling
+psutil>=5.9.0  # System monitoring
+gpustat>=1.1.0  # GPU monitoring
+py-spy>=0.3.14  # Profiling
+
+# CUDA Memory Management
+nvidia-ml-py>=11.495.46  # NVIDIA ML library for GPU monitoring
+
+# Additional acceleration libraries
+faiss-gpu>=1.7.4  # Fast similarity search with GPU
