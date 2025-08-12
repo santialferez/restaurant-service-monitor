@@ -1,14 +1,12 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import cv2
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-import torchvision.transforms as transforms
-from torchvision.models import mobilenet_v2
+import time
+from .pose_detector_yolo import PoseDetectorYOLO, Keypoints
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,49 +25,23 @@ class GestureEvent:
     response_time: Optional[float] = None
 
 
-class SimplePoseNet(nn.Module):
-    """Simplified pose estimation network for hand-raise detection"""
-    
-    def __init__(self, num_keypoints: int = 17):
-        super(SimplePoseNet, self).__init__()
-        
-        # Use MobileNetV2 as backbone
-        self.backbone = mobilenet_v2(pretrained=True).features
-        
-        # Pose estimation head
-        self.pose_head = nn.Sequential(
-            nn.AdaptiveAvgPool2d((7, 7)),
-            nn.Flatten(),
-            nn.Linear(1280 * 7 * 7, 512),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.2),
-            nn.Linear(512, 256),
-            nn.ReLU(inplace=True),
-            nn.Linear(256, num_keypoints * 3)  # x, y, confidence for each keypoint
-        )
-        
-    def forward(self, x):
-        features = self.backbone(x)
-        pose = self.pose_head(features)
-        # Reshape to (batch_size, num_keypoints, 3)
-        pose = pose.view(x.size(0), -1, 3)
-        return pose
 
 
 class GestureDetectorGPU:
-    """GPU-accelerated gesture detection using PyTorch-based pose estimation"""
+    """GPU-accelerated gesture detection using YOLOv8 pose estimation"""
     
     def __init__(self, 
                  device: Optional[str] = None,
                  batch_size: int = 8,
                  min_detection_confidence: float = 0.5,
-                 hand_raise_threshold: float = 0.7):
+                 hand_raise_threshold: float = 30,  # pixels above shoulder
+                 pose_confidence_threshold: float = 0.5):
         
         # GPU configuration
         if device is None:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         else:
-            self.device = torch.device(device)
+            self.device = device
         
         logger.info(f"GestureDetectorGPU initializing on device: {self.device}")
         
@@ -77,23 +49,15 @@ class GestureDetectorGPU:
         self.batch_size = batch_size
         self.min_detection_confidence = min_detection_confidence
         self.hand_raise_threshold = hand_raise_threshold
+        self.pose_confidence_threshold = pose_confidence_threshold
         
-        # Initialize pose estimation model
-        self.pose_model = SimplePoseNet(num_keypoints=17)
-        self.pose_model.to(self.device)
-        self.pose_model.eval()
-        
-        # Load pretrained weights if available
-        self._load_pretrained_weights()
-        
-        # Image preprocessing pipeline
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                               std=[0.229, 0.224, 0.225])
-        ])
+        # Initialize YOLOv8 pose detection model
+        self.pose_detector = PoseDetectorYOLO(
+            model_name='yolov8m-pose.pt',
+            device=self.device,
+            conf_threshold=pose_confidence_threshold,
+            batch_size=batch_size
+        )
         
         # Gesture tracking
         self.gesture_events: List[GestureEvent] = []
@@ -103,116 +67,55 @@ class GestureDetectorGPU:
         self.hand_raise_duration_threshold = 1.0  # seconds
         self.gesture_cooldown = 5.0  # seconds between gestures from same person
         
-        # Keypoint indices for COCO format
-        self.keypoint_names = [
-            'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
-            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
-            'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
-            'left_knee', 'right_knee', 'left_ankle', 'right_ankle'
-        ]
-        
-        # Batch processing buffers
-        self.roi_buffer = []
-        self.person_id_buffer = []
-        self.frame_num_buffer = []
-        self.timestamp_buffer = []
-        
         # Performance tracking
         self.processing_times = []
         
-        logger.info("GestureDetectorGPU initialized")
+        # Pose tracking for temporal stability
+        self.person_poses: Dict[int, List[Keypoints]] = {}  # Keep recent poses for smoothing
+        self.max_pose_history = 5  # frames
+        
+        logger.info("✅ GestureDetectorGPU initialized with YOLOv8 pose estimation")
     
-    def _load_pretrained_weights(self):
-        """Load pretrained weights if available"""
-        try:
-            # This is a placeholder - in production, you would load actual pretrained weights
-            # For now, we'll use the ImageNet pretrained MobileNetV2 backbone
-            logger.info("Using ImageNet pretrained MobileNetV2 backbone")
-        except Exception as e:
-            logger.warning(f"Could not load pretrained weights: {e}")
     
-    def preprocess_roi_batch(self, rois: List[np.ndarray]) -> torch.Tensor:
-        """Preprocess multiple ROIs for batch processing"""
-        batch_tensors = []
-        
-        for roi in rois:
-            if roi is None or roi.size == 0:
-                # Create dummy tensor for invalid ROI
-                tensor = torch.zeros((3, 224, 224), dtype=torch.float32)
-            else:
-                # Convert BGR to RGB
-                roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-                tensor = self.transform(roi_rgb)
-            
-            batch_tensors.append(tensor)
-        
-        # Stack into batch tensor
-        batch_tensor = torch.stack(batch_tensors, dim=0).to(self.device)
-        return batch_tensor
     
-    def detect_poses_batch(self, rois: List[np.ndarray]) -> torch.Tensor:
-        """Detect poses in multiple ROIs using batch processing"""
-        if not rois:
-            return torch.empty((0, 17, 3), device=self.device)
-        
-        # Preprocess ROIs
-        batch_tensor = self.preprocess_roi_batch(rois)
-        
-        # Batch inference
-        with torch.no_grad():
-            poses = self.pose_model(batch_tensor)
-        
-        return poses
     
     def detect_hand_raise_batch(self, 
                                frame: np.ndarray,
                                persons: Dict[int, any], 
                                frame_num: int, 
                                timestamp: float) -> List[GestureEvent]:
-        """Detect hand-raise gestures using batch processing"""
+        """Detect hand-raise gestures using YOLOv8 pose estimation"""
         
         if not persons:
             return []
         
-        start_time = datetime.now()
+        start_time = time.time()
         
-        # Extract ROIs for all persons
-        rois = []
-        person_ids = []
-        person_bboxes = []
-        
-        for person_id, person in persons.items():
-            # Extract ROI from frame
-            x1, y1, x2, y2 = person.bbox
-            
-            # Expand ROI slightly for better pose estimation
-            margin = 20
-            x1 = max(0, x1 - margin)
-            y1 = max(0, y1 - margin)
-            x2 = min(frame.shape[1], x2 + margin)
-            y2 = min(frame.shape[0], y2 + margin)
-            
-            roi = frame[y1:y2, x1:x2]
-            
-            rois.append(roi)
-            person_ids.append(person_id)
-            person_bboxes.append((x1, y1, x2, y2))
-        
-        # Detect poses in batch
-        poses = self.detect_poses_batch(rois)
-        
-        # Process pose results
         gesture_events = []
         
-        for i, (person_id, bbox, pose) in enumerate(zip(person_ids, person_bboxes, poses)):
+        # Process each person individually for better accuracy
+        for person_id, person in persons.items():
+            # Get pose for this specific person
+            pose = self.pose_detector.get_pose_for_person(frame, person.bbox)
+            
+            if pose is None:
+                continue
+                
+            # Store pose history for temporal stability
+            if person_id not in self.person_poses:
+                self.person_poses[person_id] = []
+            
+            self.person_poses[person_id].append(pose)
+            if len(self.person_poses[person_id]) > self.max_pose_history:
+                self.person_poses[person_id].pop(0)
+            
             # Analyze pose for hand-raise gesture
-            hand_raise_detected, confidence = self._analyze_hand_raise_gpu(pose)
+            hand_raise_detected, confidence = self._analyze_hand_raise_yolo(pose, person_id)
             
             if hand_raise_detected and confidence > self.min_detection_confidence:
-                # Calculate absolute position
-                x1, y1, x2, y2 = bbox
-                center_x = (x1 + x2) // 2
-                center_y = (y1 + y2) // 2
+                # Calculate position from pose
+                center_x = int((pose.bbox[0] + pose.bbox[2]) // 2)
+                center_y = int((pose.bbox[1] + pose.bbox[3]) // 2)
                 
                 # Check if this is a new gesture or continuation
                 gesture_event = self._process_gesture_detection(
@@ -223,53 +126,81 @@ class GestureDetectorGPU:
                     gesture_events.append(gesture_event)
         
         # Track processing time
-        processing_time = (datetime.now() - start_time).total_seconds()
+        processing_time = time.time() - start_time
         self.processing_times.append(processing_time)
         
         return gesture_events
     
-    def _analyze_hand_raise_gpu(self, pose: torch.Tensor) -> Tuple[bool, float]:
-        """Analyze pose keypoints for hand-raise gesture using GPU operations"""
+    def _analyze_hand_raise_yolo(self, pose: Keypoints, person_id: int) -> Tuple[bool, float]:
+        """Analyze YOLOv8 pose keypoints for hand-raise gesture"""
         
-        # Extract key points (shoulders, elbows, wrists)
-        left_shoulder = pose[5]   # left_shoulder
-        right_shoulder = pose[6]  # right_shoulder  
-        left_elbow = pose[7]      # left_elbow
-        right_elbow = pose[8]     # right_elbow
-        left_wrist = pose[9]      # left_wrist
-        right_wrist = pose[10]    # right_wrist
+        # Extract key points with confidence checking
+        left_shoulder = pose.left_shoulder    # [x, y, confidence]
+        right_shoulder = pose.right_shoulder
+        left_wrist = pose.left_wrist
+        right_wrist = pose.right_wrist
+        left_elbow = pose.left_elbow
+        right_elbow = pose.right_elbow
         
-        # Check confidence for key points
-        keypoint_confidences = torch.stack([
-            left_shoulder[2], right_shoulder[2], left_elbow[2], 
-            right_elbow[2], left_wrist[2], right_wrist[2]
-        ])
+        # Check if we have confident keypoint detections
+        key_confidences = [
+            left_shoulder[2], right_shoulder[2],
+            left_wrist[2], right_wrist[2]
+        ]
         
-        # Only proceed if we have confident detections
-        if torch.mean(keypoint_confidences) < self.min_detection_confidence:
+        avg_confidence = np.mean(key_confidences)
+        if avg_confidence < self.pose_confidence_threshold:
             return False, 0.0
         
         # Calculate shoulder midpoint
-        shoulder_mid_y = (left_shoulder[1] + right_shoulder[1]) / 2
+        if left_shoulder[2] > 0.3 and right_shoulder[2] > 0.3:
+            shoulder_mid_y = (left_shoulder[1] + right_shoulder[1]) / 2
+        elif left_shoulder[2] > 0.3:
+            shoulder_mid_y = left_shoulder[1]
+        elif right_shoulder[2] > 0.3:
+            shoulder_mid_y = right_shoulder[1]
+        else:
+            return False, 0.0
         
-        # Check if either hand is raised above shoulders
-        left_hand_raised = left_wrist[1] < shoulder_mid_y - 0.1  # Y decreases upward
-        right_hand_raised = right_wrist[1] < shoulder_mid_y - 0.1
+        # Check if either wrist is raised significantly above shoulder level
+        left_hand_raised = False
+        right_hand_raised = False
+        max_raise_distance = 0
         
-        # Calculate confidence based on how high the hand is raised
-        left_hand_height = torch.clamp((shoulder_mid_y - left_wrist[1]) * 2, 0, 1)
-        right_hand_height = torch.clamp((shoulder_mid_y - right_wrist[1]) * 2, 0, 1)
+        if left_wrist[2] > 0.4:  # Confident wrist detection
+            left_raise_distance = shoulder_mid_y - left_wrist[1]  # Positive = raised
+            if left_raise_distance > self.hand_raise_threshold:
+                left_hand_raised = True
+                max_raise_distance = max(max_raise_distance, left_raise_distance)
         
-        max_hand_height = torch.max(left_hand_height, right_hand_height)
+        if right_wrist[2] > 0.4:  # Confident wrist detection
+            right_raise_distance = shoulder_mid_y - right_wrist[1]  # Positive = raised
+            if right_raise_distance > self.hand_raise_threshold:
+                right_hand_raised = True
+                max_raise_distance = max(max_raise_distance, right_raise_distance)
         
-        # Consider additional factors for gesture confidence
-        # - Elbow position should be reasonable
-        # - Wrist confidence should be high
+        # Additional validation: check elbow position for realistic pose
+        valid_pose = True
+        if left_hand_raised and left_elbow[2] > 0.3:
+            # Left elbow should be between shoulder and wrist for natural pose
+            if not (left_wrist[1] < left_elbow[1] < left_shoulder[1]):
+                valid_pose = False
         
-        confidence = max_hand_height.item()
+        if right_hand_raised and right_elbow[2] > 0.3:
+            # Right elbow should be between shoulder and wrist for natural pose  
+            if not (right_wrist[1] < right_elbow[1] < right_shoulder[1]):
+                valid_pose = False
         
-        # Apply confidence threshold
-        hand_raised = (left_hand_raised or right_hand_raised) and confidence > self.hand_raise_threshold
+        # Use temporal smoothing to avoid false positives
+        hand_raised = (left_hand_raised or right_hand_raised) and valid_pose
+        
+        # Calculate confidence based on raise distance and keypoint confidence
+        if hand_raised:
+            # Normalize raise distance to [0, 1] range
+            distance_confidence = min(max_raise_distance / 100.0, 1.0)  # 100px = 1.0 confidence
+            confidence = (distance_confidence + avg_confidence) / 2.0
+        else:
+            confidence = 0.0
         
         return hand_raised, confidence
     
