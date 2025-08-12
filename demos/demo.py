@@ -8,7 +8,7 @@ warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main import RestaurantAnalyzer
 
@@ -20,8 +20,8 @@ print("This demo will process the first 30 seconds of video.\n")
 
 # Create analyzer with balanced settings for demo
 analyzer = RestaurantAnalyzer(
-    video_path="data/video_salon_poco_gente.MP4",
-    output_dir="data/demo_output",
+    video_path="../data/video_salon_poco_gente.MP4",
+    output_dir="../data/demo_output",
     skip_frames=15,  # Process every 15th frame (2 FPS)
     resize_factor=0.3  # Reasonable quality
 )

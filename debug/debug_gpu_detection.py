@@ -10,7 +10,7 @@ import numpy as np
 warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.core.person_tracker_gpu import PersonTrackerGPU
 from src.core.video_processor import VideoProcessor
@@ -20,7 +20,7 @@ print("="*50)
 
 # Create video processor
 video_processor = VideoProcessor(
-    video_path="data/video_salon_poco_gente.MP4",
+    video_path="../data/video_salon_poco_gente.MP4",
     skip_frames=15,
     resize_factor=0.5
 )

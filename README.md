@@ -1,6 +1,54 @@
-# Restaurant Service Video Analysis System
+# 🍽️ Restaurant Service Video Analysis System
 
-A comprehensive computer vision system for analyzing restaurant surveillance footage to track customer service metrics and operational efficiency.
+A GPU-optimized computer vision system for analyzing restaurant surveillance footage to track customer service metrics and operational efficiency in real-time.
+
+## 🎬 **[WATCH THE DEMO VIDEO](outputs/videos/restaurant_final_2min.mp4)** 
+*Professional GPU-accelerated restaurant monitoring with accurate person tracking and gesture detection*
+
+## ⚡ GPU Performance
+- **10x faster** than CPU version (5+ FPS vs 0.5 FPS)
+- **Real-time analysis** of restaurant operations
+- **CUDA acceleration** with FP16 precision
+- **Batch processing** for optimal GPU utilization
+
+## 🚀 Quick Start
+
+### GPU Version (Recommended)
+```bash
+# Install GPU dependencies
+pip install -r requirements-gpu.txt
+
+# Run GPU-optimized analysis
+cd src/
+python main_gpu.py
+
+# Generate demo video
+cd demos/
+python simple_demo_video.py
+```
+
+### CPU Version
+```bash
+# Install CPU dependencies
+pip install -r requirements.txt
+
+# Run CPU analysis
+cd src/
+python main.py
+```
+
+## 📁 Repository Structure
+
+The project is now organized into clear directories:
+- `src/` - Core source code (main applications)
+- `demos/` - Demo scripts and video generators
+- `outputs/videos/` - Final demo videos
+- `tests/` - Test scripts
+- `debug/` - Debug and analysis tools
+- `models/` - AI model files
+- `docs/` - Documentation
+
+📖 **[Full Structure Guide](docs/REPOSITORY_STRUCTURE.md)**
 
 ## Features
 

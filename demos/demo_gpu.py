@@ -9,7 +9,7 @@ warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main_gpu import RestaurantAnalyzerGPU
 
@@ -34,8 +34,8 @@ print(f"   PyTorch Version: {torch.__version__}")
 
 # Create GPU-optimized analyzer with aggressive settings for maximum performance
 analyzer = RestaurantAnalyzerGPU(
-    video_path="data/video_salon_poco_gente.MP4",
-    output_dir="data/demo_output_gpu",
+    video_path="../data/video_salon_poco_gente.MP4",
+    output_dir="../data/demo_output_gpu",
     skip_frames=15,  # Process every 15th frame (2 FPS from 30 FPS video)
     resize_factor=0.3,  # Smaller for faster processing
     batch_size=8,  # Moderate batch size for stability

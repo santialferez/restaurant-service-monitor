@@ -10,7 +10,7 @@ import json
 warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main_gpu import RestaurantAnalyzerGPU
 
@@ -32,8 +32,8 @@ else:
 # Create GPU-optimized analyzer for 2-minute analysis
 print(f"\n📊 Initializing GPU-accelerated analyzer for 2-minute analysis...")
 analyzer = RestaurantAnalyzerGPU(
-    video_path="data/video_salon_poco_gente.MP4",
-    output_dir="data/demo_gpu_2min",
+    video_path="../data/video_salon_poco_gente.MP4",
+    output_dir="../data/demo_gpu_2min",
     skip_frames=15,  # Process every 15th frame (2 FPS from 30 FPS)
     resize_factor=0.5,  # Good balance of speed vs quality
     batch_size=8,  # Good GPU utilization

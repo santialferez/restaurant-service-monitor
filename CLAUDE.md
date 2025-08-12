@@ -2,33 +2,57 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Quick Start Commands
+## 🏗️ Repository Organization (Updated)
 
-### Development and Testing
-```bash
-# Quick 30-second demo
-python demo.py
+The repository has been cleaned and organized. All development should follow this structure:
 
-# Fast testing (sparse frame sampling)
-python test_quick.py
-
-# Full analysis with default settings
-bash run_analysis.sh
-
-# Full analysis with custom video
-bash run_analysis.sh path/to/video.mp4
-
-# Manual execution with performance options
-python src/main.py data/video_salon_poco_gente.MP4 --skip-frames 10 --resize 0.3
+```
+src/           - Core application code
+demos/         - Demo scripts and video generators  
+tests/         - Test scripts
+debug/         - Debug and analysis tools
+models/        - AI model files
+outputs/       - Generated outputs (videos, reports, archive)
+scripts/       - Utility scripts
+docs/          - Documentation
 ```
 
-### Dashboard and Visualization
-```bash
-# Launch interactive dashboard
-streamlit run src/visualization/dashboard.py
+## Quick Start Commands
 
-# Check GPU availability for performance
-nvidia-smi
+### GPU-Optimized Development (Recommended)
+```bash
+# GPU analysis (10x faster)
+cd src/ && python main_gpu.py
+
+# Quick GPU demo
+cd demos/ && python simple_demo_video.py
+
+# Full GPU demo video (2min)
+cd demos/ && python demo_gpu_2min.py
+
+# GPU component testing
+cd tests/ && python test_gpu_components.py
+```
+
+### CPU Development (Legacy)
+```bash
+# CPU analysis (slower, for compatibility)
+cd src/ && python main.py
+
+# Quick CPU demo
+cd demos/ && python demo.py
+
+# CPU testing
+cd tests/ && python test_quick.py
+
+# Analysis script
+bash scripts/run_analysis.sh
+```
+
+### Final Demo Video
+```bash
+# Best demo video (GPU-optimized, accurate detection)
+outputs/videos/restaurant_final_2min.mp4
 ```
 
 ### Performance Testing Commands
@@ -38,14 +62,20 @@ nvidia-smi
 
 ## Architecture Overview
 
-### Core Processing Pipeline
-The system follows a multi-stage computer vision pipeline orchestrated by `RestaurantAnalyzer` in `src/main.py`:
+### GPU-Optimized Pipeline (Current)
+The system uses GPU acceleration for 10x performance improvement via `RestaurantAnalyzerGPU` in `src/main_gpu.py`:
 
-1. **Video Processing** (`VideoProcessor`) - Handles frame extraction with configurable skip rates and resizing
-2. **Person Detection** (`PersonTracker`) - YOLOv8 detection + DeepSORT tracking with automatic waiter/customer classification based on movement patterns  
-3. **Gesture Recognition** (`GestureDetector`) - MediaPipe pose estimation to detect hand-raising gestures
-4. **Spatial Analysis** (`TableMapper`) - Table detection/mapping and visit tracking
-5. **Analytics** (`ServiceMetricsCalculator`, `MovementAnalyzer`) - Service metrics calculation and movement pattern analysis
+1. **Video Processing** (`VideoProcessor`) - Frame extraction with 2 FPS processing
+2. **GPU Person Detection** (`PersonTrackerGPU`) - YOLOv8 + FP16 precision + DeepSORT with GPU embedder
+3. **GPU Gesture Recognition** (`GestureDetectorGPU`) - CNN-based pose estimation (replaces MediaPipe)
+4. **GPU Movement Analysis** (`MovementAnalyzerGPU`) - PyTorch tensor operations on GPU
+5. **Batch Processing** - Processes 8-frame batches for optimal GPU utilization
+
+### Key GPU Optimizations
+- **FP16 Precision**: Half-precision inference on RTX tensor cores
+- **Batch Processing**: 8-frame batches reduce GPU overhead
+- **Memory Management**: <300MB VRAM usage with torch.cuda.empty_cache()
+- **Optimized Parameters**: conf_threshold=0.6, nms_threshold=0.25
 
 ### Data Flow Architecture
 ```
@@ -106,14 +136,35 @@ Monitor these metrics during development:
 - GPU utilization (if available)
 - Detection accuracy vs. speed trade-offs
 
+### Fixed Issues & Solutions
+- **FP16 Precision Mismatch**: Fixed YOLO→DeepSORT type conversion (half→float32)
+- **Over-detection**: Tuned confidence threshold from 0.5→0.6, NMS to 0.25
+- **False Gestures**: Replaced simple heuristics with height-based motion analysis
+- **Missing Detections**: Enhanced right-side contrast, full frame processing
+- **Visual Clarity**: Increased line thickness to 2-3px, added label backgrounds
+
 ### Common Debug Commands
 ```bash
+# Check GPU status
+nvidia-smi
+
+# Debug GPU detection
+cd debug/ && python debug_gpu_detection.py
+
+# Test specific components
+cd tests/ && python test_gpu_components.py
+
 # Check video properties
-python -c "from src.core.video_processor import VideoProcessor; vp = VideoProcessor('data/video_salon_poco_gente.MP4'); print(vp.get_video_info())"
+python -c "from src.core.video_processor import VideoProcessor; vp = VideoProcessor('../data/video_salon_poco_gente.MP4'); print(vp.get_video_info())"
 
-# Test DeepSORT format
-python -c "from deep_sort_realtime.deepsort_tracker import DeepSort; print('API compatible')"
-
-# Verify output generation
-ls -la data/demo_output/  # Should show JSON, CSV, images
+# Verify outputs
+ls -la outputs/videos/     # Final videos
+ls -la outputs/reports/    # Analysis reports
+ls -la outputs/archive/    # Old/test videos
 ```
+
+### Performance Benchmarks
+- **CPU Baseline**: ~0.5 FPS
+- **GPU Optimized**: 5+ FPS (10x improvement)
+- **Memory**: 270MB GPU VRAM
+- **Accuracy**: 16+ people tracked simultaneously

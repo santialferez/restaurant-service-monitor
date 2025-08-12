@@ -45,7 +45,8 @@ class PersonTrackerGPU:
                  movement_threshold: float = 4.0,  # Higher threshold for better classification
                  batch_size: int = 8,
                  use_tensorrt: bool = True,
-                 use_half_precision: bool = True):
+                 use_half_precision: bool = True,
+                 nms_threshold: float = 0.3):
         
         # GPU configuration
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -73,7 +74,7 @@ class PersonTrackerGPU:
         self.tracker = DeepSort(
             max_age=max_age, 
             n_init=2,  # Fewer frames to confirm track (faster detection)
-            nms_max_overlap=0.3,  # Stricter overlap threshold to avoid duplicates
+            nms_max_overlap=nms_threshold,  # Configurable NMS threshold
             embedder="mobilenet",  # Use MobileNet embedder
             embedder_gpu=True,  # Enable GPU embedder
             embedder_model_name="mobilenetv2_x1_0",

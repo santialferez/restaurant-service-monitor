@@ -9,7 +9,7 @@ import time
 warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main_gpu import RestaurantAnalyzerGPU
 
@@ -39,8 +39,8 @@ print(f"   Matrix multiplication (4M elements): {gpu_time:.3f}s")
 # Create analyzer with moderate settings
 print(f"\n📊 Initializing GPU-accelerated analyzer...")
 analyzer = RestaurantAnalyzerGPU(
-    video_path="data/video_salon_poco_gente.MP4",
-    output_dir="data/demo_gpu_quick",
+    video_path="../data/video_salon_poco_gente.MP4",
+    output_dir="../data/demo_gpu_quick",
     skip_frames=20,  # Process every 20th frame for speed
     resize_factor=0.4,  # Moderate resolution 
     batch_size=4,  # Smaller batch for quick demo

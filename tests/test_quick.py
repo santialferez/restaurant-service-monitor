@@ -11,7 +11,7 @@ warnings.filterwarnings('ignore')
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # Add project root to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.main import RestaurantAnalyzer
 
@@ -26,8 +26,8 @@ def quick_test():
     
     # Create analyzer with very aggressive settings for speed
     analyzer = RestaurantAnalyzer(
-        video_path="data/video_salon_poco_gente.MP4",
-        output_dir="data/test_output",
+        video_path="../data/video_salon_poco_gente.MP4",
+        output_dir="../data/test_output",
         skip_frames=100,  # Process only every 100th frame
         resize_factor=0.2  # Very small resolution
     )
